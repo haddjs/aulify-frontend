@@ -1,0 +1,130 @@
+@import url("https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&display=swap");
+@import "tailwindcss";
+
+@theme inline {
+  --font-display: "Nunito", sans-serif;
+  --font-body: "Nunito", sans-serif;
+
+  --color-clay-bg: #f0eaf8;
+  --color-clay-card: #ffffff;
+  --color-clay-mint: #c8f0e0;
+  --color-clay-coral: #ffcfc5;
+  --color-clay-lavender: #d9d0f8;
+  --color-clay-yellow: #fef0c0;
+  --color-clay-blue: #c5e4ff;
+  --color-clay-pink: #ffd6ec;
+  --color-clay-purple: #b39ddb;
+  --color-clay-text: #3d2f5e;
+  --color-clay-muted: #8b7aaa;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: "Nunito", sans-serif;
+  background-color: #f0eaf8;
+  color: #3d2f5e;
+  margin: 0;
+  padding: 0;
+}
+
+::-webkit-scrollbar {
+  display: none;
+}
+
+.clay-card {
+  background: #ffffff;
+  border-radius: 28px;
+  box-shadow:
+    0 8px 0 #d5c8ef,
+    0 12px 24px rgba(139, 100, 200, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.clay-card-mint {
+  background: linear-gradient(135deg, #d4f5e8 0%, #c0eed9 100%);
+  border-radius: 28px;
+  box-shadow:
+    0 8px 0 #8ed5b5,
+    0 12px 24px rgba(100, 200, 160, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.clay-card-coral {
+  background: linear-gradient(135deg, #ffd8ce 0%, #ffcdc1 100%);
+  border-radius: 28px;
+  box-shadow:
+    0 8px 0 #f0a090,
+    0 12px 24px rgba(220, 120, 100, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.clay-card-lavender {
+  background: linear-gradient(135deg, #e0d8ff 0%, #d2c8fc 100%);
+  border-radius: 28px;
+  box-shadow:
+    0 8px 0 #a090e0,
+    0 12px 24px rgba(140, 100, 220, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.clay-card-yellow {
+  background: linear-gradient(135deg, #fff3cc 0%, #feeab0 100%);
+  border-radius: 28px;
+  box-shadow:
+    0 8px 0 #e0c870,
+    0 12px 24px rgba(200, 170, 50, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.clay-card-blue {
+  background: linear-gradient(135deg, #cce9ff 0%, #b8dcff 100%);
+  border-radius: 28px;
+  box-shadow:
+    0 8px 0 #7ab8f0,
+    0 12px 24px rgba(80, 150, 230, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.clay-card-purple {
+  background: linear-gradient(135deg, #6c4fcf 0%, #8866e8 100%);
+  border-radius: 28px;
+  box-shadow:
+    0 8px 0 #4a30a0,
+    0 12px 24px rgba(80, 50, 180, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.clay-btn {
+  border-radius: 20px;
+  box-shadow:
+    0 5px 0 #a080d0,
+    0 8px 16px rgba(140, 100, 200, 0.2);
+  transition: all 0.12s ease;
+  cursor: pointer;
+}
+
+.clay-btn:active {
+  transform: translateY(3px);
+  box-shadow:
+    0 2px 0 #a080d0,
+    0 4px 8px rgba(140, 100, 200, 0.2);
+}
+
+.clay-pill {
+  border-radius: 999px;
+  box-shadow:
+    0 4px 0 rgba(0, 0, 0, 0.1),
+    0 6px 12px rgba(0, 0, 0, 0.08);
+}
+
+.tab-active {
+  background: #6c4fcf;
+  color: white;
+  border-radius: 20px;
+  box-shadow:
+    0 4px 0 #4a30a0,
+    0 6px 14px rgba(80, 50, 180, 0.3);
+}
