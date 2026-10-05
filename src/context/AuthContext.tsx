@@ -16,6 +16,8 @@ interface User {
 interface AuthContextValue {
   user: User | null;
   loading: boolean;
+  error: Error | null;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -63,8 +65,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => controller.abort();
   }, []);
 
+  const logout = async () => {
+    try {
+      await fetch(`${import.meta.env.VITE_BASE_URL}/auth/logout`, {
+        method: "POST",
+        credentials: "include",
+      });
+    } catch (err) {
+      console.error("Logout request failed:", err);
+    } finally {
+      setUser(null);
+    }
+  };
+
   const value = useMemo(
-    () => ({ user, loading, error }),
+    () => ({ user, loading, error, logout }),
     [user, loading, error],
   );
 
