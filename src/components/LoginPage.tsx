@@ -32,7 +32,7 @@ export default function LoginPage() {
             💜
           </div>
           <div>
-            <div className="text-[20px] font-black text-white">Claypay</div>
+            <div className="text-[20px] font-black text-white">Aulify</div>
             <div className="text-[12px] text-white/70 font-semibold">
               Money Manager
             </div>
@@ -131,7 +131,7 @@ export default function LoginPage() {
           {/* Heading */}
           <div className="mb-7">
             <h1 className="text-[28px] font-black text-clay-text mb-1">
-              {mode === "login" ? "Welcome back 👋" : "Join Claypay 🎉"}
+              {mode === "login" ? "Welcome back 👋" : "Join Aulify 🎉"}
             </h1>
             <p className="text-[14px] text-clay-muted font-semibold">
               {mode === "login"
