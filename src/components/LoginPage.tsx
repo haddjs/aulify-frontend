@@ -87,10 +87,6 @@ export default function LoginPage() {
             ))}
           </div>
         </div>
-
-        <div className="relative z-10 text-[12px] text-white/50 font-semibold">
-          © 2026 Claypay Inc.
-        </div>
       </div>
 
       {/* Right — form panel */}
@@ -107,7 +103,7 @@ export default function LoginPage() {
             </div>
             <div>
               <div className="text-[18px] font-black text-clay-text">
-                Claypay
+                Aulify
               </div>
               <div className="text-[11px] text-clay-muted font-semibold">
                 Money Manager
