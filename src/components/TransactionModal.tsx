@@ -116,7 +116,7 @@ export default function TransactionModal({
   return (
     <div
       onClick={handleClose}
-      className={`fixed inset-0 z-50 flex items-end justify-center transition-all duration-260 ease-out ${
+      className={`fixed inset-0 z-100 flex items-end justify-center transition-all duration-260 ease-out ${
         visible
           ? "bg-clay-text/35 backdrop-blur-xs"
           : "bg-transparent backdrop-blur-none"
