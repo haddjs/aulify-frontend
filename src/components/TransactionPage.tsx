@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { createCategory } from "../api/categories";
+import type { Category } from "../hooks/useCategories";
 import { useCategories } from "../hooks/useCategories";
+import type { Transaction } from "../hooks/useTransactions";
 import { useTransactions } from "../hooks/useTransactions";
 import CategoryModal from "./CategoryModal";
 import type { ModalType, TransactionData } from "./TransactionModal";
@@ -26,13 +28,20 @@ export default function TransactionPage() {
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
   const [mode, setMode] = useState<ViewMode>("expense");
 
-  // Modal states matching Homepage pattern
+  // Modal states
   const [modal, setModal] = useState<ModalType | null>(null);
+  const [editingTransaction, setEditingTransaction] =
+    useState<Transaction | null>(null);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
 
   // Data hooks
-  const { transactions, addTransaction } = useTransactions();
-  const { categories: rawCategories, addCategoryLocally } = useCategories();
+  const { transactions, addTransaction, editTransaction, setTransactions } = useTransactions();
+  const {
+    categories: rawCategories,
+    addCategoryLocally,
+    editCategory,
+  } = useCategories();
 
   const now = new Date();
   const monthName = now.toLocaleDateString("id-ID", { month: "long" });
@@ -46,12 +55,16 @@ export default function TransactionPage() {
     if (tx.type !== mode) return false;
     if (!tx.transaction_date) return false;
 
-    const [y, m, d] = tx.transaction_date.substring(0, 10).split("-").map(Number);
+    const [y, m, d] = tx.transaction_date
+      .substring(0, 10)
+      .split("-")
+      .map(Number);
     const txDate = new Date(y, m - 1, d);
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
     if (period === "week") {
-      const diffDays = (today.getTime() - txDate.getTime()) / (1000 * 3600 * 24);
+      const diffDays =
+        (today.getTime() - txDate.getTime()) / (1000 * 3600 * 24);
       return diffDays >= -1 && diffDays <= 7;
     }
     if (period === "month") {
@@ -86,7 +99,9 @@ export default function TransactionPage() {
   );
 
   const total = chartCategories.reduce((sum, c) => sum + c.value, 0);
-  const sortedCategories = [...chartCategories].sort((a, b) => b.value - a.value);
+  const sortedCategories = [...chartCategories].sort(
+    (a, b) => b.value - a.value,
+  );
   const topCategory = sortedCategories[0];
 
   // Dynamic Daily Average calculation
@@ -114,7 +129,10 @@ export default function TransactionPage() {
       .filter((tx) => {
         if (tx.type !== mode) return false;
         if (!tx.transaction_date) return false;
-        const [y, m] = tx.transaction_date.substring(0, 7).split("-").map(Number);
+        const [y, m] = tx.transaction_date
+          .substring(0, 7)
+          .split("-")
+          .map(Number);
         return y === targetYear && m - 1 === targetMonth;
       })
       .reduce((sum, tx) => sum + Number(tx.amount), 0);
@@ -125,12 +143,17 @@ export default function TransactionPage() {
   const maxMonthTotal = Math.max(...monthlyTrend.map((ms) => ms.total), 1);
 
   // Handlers for TransactionModal
-  const handleSaveTransaction = async (data: TransactionData) => {
+  const handleSaveTransaction = async (data: TransactionData, id?: string) => {
     try {
-      await addTransaction(data);
+      if (id) {
+        await editTransaction(id, data);
+      } else {
+        await addTransaction(data);
+      }
       setModal(null);
+      setEditingTransaction(null);
     } catch (err) {
-      console.error("Failed to create transaction:", err);
+      console.error("Failed to save transaction:", err);
     }
   };
 
@@ -147,16 +170,34 @@ export default function TransactionPage() {
   };
 
   // Handler for detailed CategoryModal
-  const handleSaveDetailedCategory = async ({
-    name,
-    type,
-  }: {
-    name: string;
-    type: "expense" | "income";
-  }) => {
-    const newCategory = await createCategory({ name, type });
-    addCategoryLocally(newCategory);
-    return newCategory;
+  const handleSaveDetailedCategory = async (
+    {
+      name,
+      type,
+    }: {
+      name: string;
+      type: "expense" | "income";
+    },
+    id?: string,
+  ) => {
+    if (id) {
+      const updated = await editCategory(id, name);
+      // Also update category_name on all transactions that belong to this category
+      setTransactions((prev) =>
+        prev.map((tx) =>
+          tx.category_id === id ? { ...tx, category_name: updated.name } : tx,
+        ),
+      );
+      setIsCategoryModalOpen(false);
+      setEditingCategory(null);
+      return updated;
+    } else {
+      const newCategory = await createCategory({ name, type });
+      addCategoryLocally(newCategory);
+      setIsCategoryModalOpen(false);
+      setEditingCategory(null);
+      return newCategory;
+    }
   };
 
   return (
@@ -269,14 +310,16 @@ export default function TransactionPage() {
 
             {chartCategories.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-65 gap-2 text-center w-full">
-                <div className="w-16 h-16 rounded-full bg-[#f0eaf8] flex items-center justify-center text-2xl shadow-[inset_0_2px_4px_rgba(0,0,0,0.06)]">
+                <div className="w-16 h-16 rounded-full bg-clay-bg flex items-center justify-center text-2xl shadow-[inset_0_2px_4px_rgba(0,0,0,0.06)]">
                   {mode === "expense" ? "💸" : "💰"}
                 </div>
                 <p className="text-sm font-extrabold text-clay-text m-0">
-                  No {mode === "expense" ? "expenses" : "income"} in this {period}
+                  No {mode === "expense" ? "expenses" : "income"} in this{" "}
+                  {period}
                 </p>
                 <p className="text-xs text-clay-muted font-semibold m-0">
-                  Click below to record your first {mode === "expense" ? "expense" : "income"}
+                  Click below to record your first{" "}
+                  {mode === "expense" ? "expense" : "income"}
                 </p>
                 <button
                   onClick={() => setModal(mode)}
@@ -336,11 +379,17 @@ export default function TransactionPage() {
                   {activeIdx !== null && chartCategories[activeIdx] ? (
                     <>
                       <div className="text-[18px] font-black text-clay-text">
-                        Rp {chartCategories[activeIdx].value.toLocaleString("id-ID")}
+                        Rp{" "}
+                        {chartCategories[activeIdx].value.toLocaleString(
+                          "id-ID",
+                        )}
                       </div>
                       <div className="text-[11px] text-clay-muted font-semibold">
                         {total > 0
-                          ? ((chartCategories[activeIdx].value / total) * 100).toFixed(0)
+                          ? (
+                              (chartCategories[activeIdx].value / total) *
+                              100
+                            ).toFixed(0)
                           : 0}
                         %
                       </div>
@@ -437,7 +486,8 @@ export default function TransactionPage() {
                   By Category
                 </h3>
                 <span className="text-[12px] font-bold text-clay-muted">
-                  ({chartCategories.length} {chartCategories.length === 1 ? "Category" : "Categories"})
+                  ({chartCategories.length}{" "}
+                  {chartCategories.length === 1 ? "Category" : "Categories"})
                 </span>
               </div>
               <button
@@ -450,37 +500,76 @@ export default function TransactionPage() {
 
             {sortedCategories.length === 0 ? (
               <div className="py-8 text-center text-clay-muted text-[13px] font-semibold">
-                No categories found for this period. Click "+ New Category" to create one.
+                No categories found for this period. Click "+ New Category" to
+                create one.
               </div>
             ) : (
               <div className="flex flex-col gap-3">
-                {sortedCategories.map((cat) => (
-                  <div
-                    key={cat.name}
-                    className="bg-[#fcfaff] border border-clay-bg rounded-[20px] px-4 py-3 flex items-center gap-3 shadow-[0_2px_8px_rgba(0,0,0,0.02)]"
-                  >
-                    <div className="flex-1">
-                      <div className="flex justify-between mb-1.5">
-                        <span className="text-[13px] font-extrabold text-clay-text">
-                          {cat.name}
-                        </span>
-                        <span className="text-[13px] font-black text-clay-text">
-                          Rp {cat.value.toLocaleString("id-ID")}
-                        </span>
+                {sortedCategories.map((cat) => {
+                  // Find a transaction in this period that has this category name
+                  // then look up the category by id (robust against renames)
+                  const sampleTx = filteredTransactions.find(
+                    (tx) => tx.category_name === cat.name && tx.type === mode,
+                  );
+                  const matchedCat = sampleTx?.category_id
+                    ? rawCategories.find((c) => c.id === sampleTx.category_id)
+                    : rawCategories.find(
+                        (c) => c.name === cat.name && c.type === mode,
+                      );
+                  const isCustom = matchedCat && matchedCat.user_id !== null;
+
+                  return (
+                    <div
+                      key={cat.name}
+                      className="bg-[#fcfaff] border border-clay-bg rounded-[20px] px-4 py-3 flex items-center gap-3 shadow-[0_2px_8px_rgba(0,0,0,0.02)]"
+                    >
+                      <div className="flex-1">
+                        <div className="flex justify-between items-center mb-1.5">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[13px] font-extrabold text-clay-text">
+                              {cat.name}
+                            </span>
+                          </div>
+                          <span className="text-[13px] font-black text-clay-text">
+                            Rp {cat.value.toLocaleString("id-ID")}
+                          </span>
+                        </div>
+                        <div className="h-2 bg-clay-bg rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all duration-600 ease-out"
+                            style={{
+                              width: `${total > 0 ? (cat.value / total) * 100 : 0}%`,
+                              backgroundColor: cat.color,
+                              boxShadow: `0 2px 0 ${cat.shadows}`,
+                            }}
+                          />
+                        </div>
                       </div>
-                      <div className="h-2 bg-clay-bg rounded-full overflow-hidden">
-                        <div
-                          className="h-full rounded-full transition-all duration-600 ease-out"
-                          style={{
-                            width: `${total > 0 ? (cat.value / total) * 100 : 0}%`,
-                            backgroundColor: cat.color,
-                            boxShadow: `0 2px 0 ${cat.shadows}`,
-                          }}
-                        />
+                      <div>
+                        {isCustom ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingCategory(matchedCat);
+                              setIsCategoryModalOpen(true);
+                            }}
+                            className="clay-card px-2 py-0.5 rounded-lg border-none cursor-pointer text-[10px] font-extrabold text-[#6c4fcf] hover:bg-[#ede8f8] shadow-[0_2px_0_#d5c8ef] active:translate-y-0.5"
+                            title="Edit category name"
+                          >
+                            ✏️ Edit
+                          </button>
+                        ) : (
+                          <span
+                            className="text-[10px] text-clay-muted font-bold px-1.5 py-0.2 rounded bg-[#ede8f8]/50"
+                            title="Preset system category (locked)"
+                          >
+                            Preset
+                          </span>
+                        )}
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -544,23 +633,142 @@ export default function TransactionPage() {
         </div>
       </div>
 
-      {/* Transaction Modal (for adding expense/income) */}
+      {/* Transaction List Section for the selected period */}
+      <div className="mt-8 clay-card p-5 sm:p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-[18px] font-black text-clay-text m-0">
+              {mode === "expense" ? "Expense" : "Income"} Transactions
+            </h2>
+            <p className="text-[12px] text-clay-muted font-semibold mt-0.5">
+              Showing {filteredTransactions.length}{" "}
+              {filteredTransactions.length === 1 ? "record" : "records"} for
+              this {period}
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              setEditingTransaction(null);
+              setModal(mode);
+            }}
+            className="bg-[linear-gradient(135deg,#6c4fcf_0%,#8866e8_100%)] text-white font-extrabold text-[12px] font-['Nunito',sans-serif] px-3.5 py-2 rounded-[14px] shadow-[0_3px_0_#4a30a0] border-none cursor-pointer active:translate-y-0.5"
+          >
+            + New {mode === "expense" ? "Expense" : "Income"}
+          </button>
+        </div>
+
+        {filteredTransactions.length === 0 ? (
+          <div className="py-10 text-center flex flex-col items-center justify-center gap-2">
+            <span className="text-3xl">🧾</span>
+            <p className="text-[13px] font-extrabold text-clay-text m-0">
+              No transactions recorded for this {period}
+            </p>
+            <p className="text-[11px] text-clay-muted font-semibold m-0">
+              Click "+ New" to add one
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {filteredTransactions.map((tx) => {
+              const formattedDate = tx.transaction_date
+                ? new Date(tx.transaction_date).toLocaleDateString("id-ID", {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                  })
+                : "No date";
+
+              return (
+                <div
+                  key={tx.id}
+                  onClick={() => {
+                    setEditingTransaction(tx);
+                    setModal(tx.type);
+                  }}
+                  className="bg-[#fcfaff] border border-clay-bg rounded-[20px] px-4 py-3 flex items-center justify-between gap-3 shadow-[0_2px_8px_rgba(0,0,0,0.02)] cursor-pointer hover:bg-[#ede8f8]/60 transition-all active:scale-[0.99] group"
+                  title="Click to edit transaction"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[13px] font-black text-clay-text truncate">
+                        {tx.category_name ?? "Uncategorized"}
+                      </span>
+                      <span className="text-[11px] font-semibold text-clay-muted">
+                        • {formattedDate}
+                      </span>
+                    </div>
+                    {tx.note && (
+                      <p className="text-[12px] text-clay-muted font-semibold truncate m-0 mt-0.5">
+                        {tx.note}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span
+                      className={`text-[14px] font-black whitespace-nowrap ${
+                        mode === "income" ? "text-[#1db070]" : "text-[#e05050]"
+                      }`}
+                    >
+                      {mode === "income" ? "+" : "-"} Rp{" "}
+                      {Number(tx.amount).toLocaleString("id-ID")}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingTransaction(tx);
+                        setModal(tx.type);
+                      }}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity bg-white hover:bg-gray-50 rounded-lg p-1.5 border border-clay-bg cursor-pointer text-xs shadow-xs"
+                      title="Edit transaction"
+                    >
+                      ✏️
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Transaction Modal (for adding or editing expense/income) */}
       {modal && (
         <TransactionModal
           type={modal}
           categories={rawCategories}
-          onClose={() => setModal(null)}
+          initialData={
+            editingTransaction
+              ? {
+                  id: editingTransaction.id,
+                  type: editingTransaction.type,
+                  categoryId: editingTransaction.category_id,
+                  amount: editingTransaction.amount,
+                  note: editingTransaction.note,
+                  transaction_date: editingTransaction.transaction_date,
+                }
+              : null
+          }
+          onClose={() => {
+            setModal(null);
+            setEditingTransaction(null);
+          }}
           onSave={handleSaveTransaction}
           onAddCategory={handleAddCategoryQuick}
         />
       )}
 
-      {/* Detailed Category Creation Modal */}
+      {/* Detailed Category Creation / Editing Modal */}
       {isCategoryModalOpen && (
         <CategoryModal
           initialType={mode}
           existingCategories={rawCategories}
-          onClose={() => setIsCategoryModalOpen(false)}
+          categoryToEdit={editingCategory}
+          onClose={() => {
+            setIsCategoryModalOpen(false);
+            setEditingCategory(null);
+          }}
           onSave={handleSaveDetailedCategory}
         />
       )}

@@ -9,12 +9,16 @@ import TransactionModal, { type ModalType } from "./TransactionModal";
 export default function HomePage() {
   const [balanceVisible, setBalanceVisible] = useState(true);
   const [modal, setModal] = useState<ModalType | null>(null);
+  const [editingTransaction, setEditingTransaction] =
+    useState<import("../hooks/useTransactions").Transaction | null>(null);
   const { categories, addCategoryLocally } = useCategories();
+
   const { user, logout } = useAuth();
   const {
     transactions,
     balance: balanceData,
     addTransaction,
+    editTransaction,
   } = useTransactions();
 
   const balance = Number(balanceData?.balance ?? 0);
@@ -44,15 +48,22 @@ export default function HomePage() {
     }
   }
 
-  async function handleSaveTransaction(data: TransactionData) {
+  async function handleSaveTransaction(data: TransactionData, id?: string) {
     try {
-      await addTransaction(data);
+      if (id) {
+        await editTransaction(id, data);
+      } else {
+        await addTransaction(data);
+      }
 
       setModal(null);
+      setEditingTransaction(null);
     } catch (err) {
-      console.error("Failed to create transaction:", err);
+      console.error("Failed to save transaction:", err);
+      throw err;
     }
   }
+
 
   return (
     <div className="p-4 sm:p-6 lg:p-10">
@@ -186,23 +197,44 @@ export default function HomePage() {
               return (
                 <div
                   key={tx.id}
-                  className="clay-card flex items-center gap-3 px-4 py-3"
+                  onClick={() => {
+                    setEditingTransaction(tx);
+                    setModal(tx.type);
+                  }}
+                  className="clay-card flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-[#ede8f8]/60 transition-all active:scale-[0.99] group"
+                  title="Click to edit transaction"
                 >
-                  <div className="flex-1">
-                    <p className="text-sm font-extrabold text-clay-text m-0">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-extrabold text-clay-text m-0 truncate">
                       {tx.category_name ?? "Uncategorized"}
                     </p>
-                    <p className="text-sm text-clay-muted me-1 font-bold">
-                      {tx.note}
+                    <p className="text-sm text-clay-muted me-1 font-bold truncate">
+                      {tx.note || "No note"}
                     </p>
                   </div>
-                  <span
-                    className={`${isIncome ? `text-[#1db070]` : `text-[#e05050]`} text-md font-extrabold`}
-                  >
-                    {isIncome ? "+" : "-"}
-                    {" Rp "}
-                    {Number(tx.amount).toLocaleString("id-ID")}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`${
+                        isIncome ? `text-[#1db070]` : `text-[#e05050]`
+                      } text-md font-extrabold whitespace-nowrap`}
+                    >
+                      {isIncome ? "+" : "-"}
+                      {" Rp "}
+                      {Number(tx.amount).toLocaleString("id-ID")}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingTransaction(tx);
+                        setModal(tx.type);
+                      }}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity bg-white/70 hover:bg-white rounded-lg p-1.5 border-none cursor-pointer text-xs"
+                      title="Edit transaction"
+                    >
+                      ✏️
+                    </button>
+                  </div>
                 </div>
               );
             })}
@@ -213,7 +245,22 @@ export default function HomePage() {
         <TransactionModal
           type={modal}
           categories={categories}
-          onClose={() => setModal(null)}
+          initialData={
+            editingTransaction
+              ? {
+                  id: editingTransaction.id,
+                  type: editingTransaction.type,
+                  categoryId: editingTransaction.category_id,
+                  amount: editingTransaction.amount,
+                  note: editingTransaction.note,
+                  transaction_date: editingTransaction.transaction_date,
+                }
+              : null
+          }
+          onClose={() => {
+            setModal(null);
+            setEditingTransaction(null);
+          }}
           onSave={handleSaveTransaction}
           onAddCategory={handleAddCategory}
         />
@@ -221,3 +268,4 @@ export default function HomePage() {
     </div>
   );
 }
+

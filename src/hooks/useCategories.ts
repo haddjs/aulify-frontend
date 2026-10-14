@@ -1,4 +1,6 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
+
+import { updateCategory } from "../api/categories";
 import { useFetch } from "./useFetch";
 
 export interface Category {
@@ -10,14 +12,26 @@ export interface Category {
 
 export function useCategories() {
   const { data, loading, error } = useFetch<Category[]>("/categories");
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [localCategories, setLocalCategories] = useState<Category[] | null>(
+    null,
+  );
 
-  useEffect(() => {
-    if (data) setCategories(data);
-  }, [data]);
+  const categories = localCategories ?? data ?? [];
 
   const addCategoryLocally = (newCat: Category) => {
-    setCategories((prev) => [...prev, newCat]);
+    setLocalCategories((prev) => [...(prev ?? data ?? []), newCat]);
+  };
+
+  const updateCategoryLocally = (updatedCat: Category) => {
+    setLocalCategories((prev) =>
+      (prev ?? data ?? []).map((c) => (c.id === updatedCat.id ? updatedCat : c)),
+    );
+  };
+
+  const editCategory = async (id: string, name: string) => {
+    const updated = await updateCategory(id, { name });
+    updateCategoryLocally(updated);
+    return updated;
   };
 
   return {
@@ -25,5 +39,9 @@ export function useCategories() {
     loading,
     error,
     addCategoryLocally,
+    updateCategoryLocally,
+    editCategory,
   };
 }
+
+

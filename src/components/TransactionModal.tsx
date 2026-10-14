@@ -11,11 +11,22 @@ export interface TransactionData {
   amount: number;
 }
 
+export interface InitialTransactionData {
+  id: string;
+  type: ModalType;
+  categoryId?: string | null;
+  amount: number | string;
+  note?: string | null;
+  date?: string;
+  transaction_date?: string;
+}
+
 interface Props {
   type: ModalType;
   categories: Category[];
+  initialData?: InitialTransactionData | null;
   onClose: () => void;
-  onSave: (data: TransactionData) => void;
+  onSave: (data: TransactionData, id?: string) => Promise<void> | void;
   onAddCategory?: (category: {
     name: string;
     type: ModalType;
@@ -25,16 +36,37 @@ interface Props {
 export default function TransactionModal({
   type,
   categories,
+  initialData,
   onClose,
   onSave,
   onAddCategory,
 }: Props) {
+  const isEdit = Boolean(initialData);
+  const [currentType, setCurrentType] = useState<ModalType>(
+    initialData?.type ?? type,
+  );
   // Form State
-  const [categoryId, setCategoryId] = useState("");
-  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
-  const [note, setNote] = useState("");
-  const [amount, setAmount] = useState("");
+  const [categoryId, setCategoryId] = useState(initialData?.categoryId ?? "");
+  const [date, setDate] = useState(() => {
+    const raw = initialData?.date ?? initialData?.transaction_date;
+    if (raw) return raw.substring(0, 10);
+    return new Date().toISOString().split("T")[0];
+  });
+  const [note, setNote] = useState(initialData?.note ?? "");
+  // Raw digits only (no dots/commas) — this is what we send to the API
+  const [rawAmount, setRawAmount] = useState(() => {
+    if (initialData?.amount !== undefined && initialData.amount !== "")
+      return String(Number(initialData.amount)); // strip any decimals from edit mode
+    return "";
+  });
+  // Formatted display string e.g. "2.000.000"
+  const formatIDR = (digits: string) => {
+    if (!digits) return "";
+    return Number(digits).toLocaleString("id-ID");
+  };
   const [visible, setVisible] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [addingCategory, setAddingCategory] = useState(false);
   const [newCategoryText, setNewCategoryText] = useState("");
   const [addCategoryError, setAddCategoryError] = useState<string | null>(null);
@@ -42,8 +74,8 @@ export default function TransactionModal({
   const newCategoryInputRef = useRef<HTMLInputElement>(null);
 
   // Filter dynamic categories matching current modal type
-  const availableCategories = categories.filter((c) => c.type === type);
-  const isExpense = type === "expense";
+  const availableCategories = categories.filter((c) => c.type === currentType);
+  const isExpense = currentType === "expense";
 
   // Dynamic styling variables
   const accentLightBg = isExpense ? "bg-[#ffd8ce]" : "bg-[#d4f5e8]";
@@ -72,19 +104,31 @@ export default function TransactionModal({
     setTimeout(onClose, 260);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!categoryId || !amount) return;
+    if (!categoryId || !rawAmount) return;
 
-    onSave({
-      type,
-      categoryId,
-      date,
-      note: note.trim() || null,
-      amount: Number(amount),
-    });
-
-    handleClose();
+    try {
+      setSubmitting(true);
+      setError(null);
+      await onSave(
+        {
+          type: currentType,
+          categoryId,
+          date,
+          note: note.trim() || null,
+          amount: Number(rawAmount),
+        },
+        initialData?.id,
+      );
+      handleClose();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to save transaction",
+      );
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleStartAddCategory = () => {
@@ -101,7 +145,10 @@ export default function TransactionModal({
     if (!trimmed || !onAddCategory) return;
 
     try {
-      const newCategory = await onAddCategory({ name: trimmed, type });
+      const newCategory = await onAddCategory({
+        name: trimmed,
+        type: currentType,
+      });
       setCategoryId(newCategory.id);
       setNewCategoryText("");
       setAddingCategory(false);
@@ -143,10 +190,16 @@ export default function TransactionModal({
             </div>
             <div>
               <div className="text-[20px] font-black text-clay-text">
-                Add {isExpense ? "Expense" : "Income"}
+                {isEdit
+                  ? `Edit ${isExpense ? "Expense" : "Income"}`
+                  : `Add ${isExpense ? "Expense" : "Income"}`}
               </div>
               <div className="text-[12px] text-clay-muted font-semibold">
-                {isExpense ? "Record what you spent" : "Record what you earned"}
+                {isEdit
+                  ? "Update your transaction details"
+                  : isExpense
+                    ? "Record what you spent"
+                    : "Record what you earned"}
               </div>
             </div>
           </div>
@@ -160,6 +213,38 @@ export default function TransactionModal({
         </div>
 
         <form onSubmit={handleSave} className="px-6 flex flex-col gap-4">
+          {/* Type Switcher */}
+          <div className="clay-card p-1.5 flex gap-2 rounded-2xl">
+            <button
+              type="button"
+              onClick={() => {
+                setCurrentType("expense");
+                setCategoryId("");
+              }}
+              className={`flex-1 py-2 px-3 border-none cursor-pointer rounded-xl font-['Nunito',sans-serif] text-[13px] font-extrabold transition-all duration-200 flex items-center justify-center gap-1.5 ${
+                isExpense
+                  ? "bg-[linear-gradient(135deg,#ff7660,#ff5a43)] text-white shadow-[0_3px_0_#d43f29]"
+                  : "bg-transparent text-clay-muted"
+              }`}
+            >
+              <span>📤</span> Expense
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setCurrentType("income");
+                setCategoryId("");
+              }}
+              className={`flex-1 py-2 px-3 border-none cursor-pointer rounded-xl font-['Nunito',sans-serif] text-[13px] font-extrabold transition-all duration-200 flex items-center justify-center gap-1.5 ${
+                !isExpense
+                  ? "bg-[linear-gradient(135deg,#1db070,#148a50)] text-white shadow-[0_3px_0_#0f683c]"
+                  : "bg-transparent text-clay-muted"
+              }`}
+            >
+              <span>📥</span> Income
+            </button>
+          </div>
+
           {/* Amount input */}
           <div
             className={`${accentLightBg} rounded-3xl p-5 ${amountBoxShadow}`}
@@ -174,12 +259,15 @@ export default function TransactionModal({
                 Rp
               </span>
               <input
-                type="number"
-                min="1"
-                step="any"
+                type="text"
+                inputMode="numeric"
                 placeholder="0"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                value={formatIDR(rawAmount)}
+                onChange={(e) => {
+                  // Strip everything except digits
+                  const digits = e.target.value.replace(/\D/g, "");
+                  setRawAmount(digits);
+                }}
                 required
                 className={`flex-1 border-none outline-none bg-transparent text-[36px] font-black ${accentTextColor} font-['Nunito',sans-serif] w-full`}
               />
@@ -194,7 +282,7 @@ export default function TransactionModal({
             <div className="flex flex-wrap gap-2 mt-2">
               {availableCategories.length === 0 ? (
                 <p className="text-xs text-clay-muted italic">
-                  No {type} categories found.
+                  No {currentType} categories found.
                 </p>
               ) : (
                 availableCategories.map((c) => (
@@ -305,12 +393,27 @@ export default function TransactionModal({
             </div>
           </div>
 
+          {/* Error Message */}
+          {error && (
+            <div className="p-3 bg-[#ffe0d8] border border-[#f0a090] rounded-xl text-[12px] font-extrabold text-[#c03030] flex items-center gap-2">
+              <span>⚠️</span>
+              <span>{error}</span>
+            </div>
+          )}
+
           {/* Submit */}
           <button
             type="submit"
-            className="bg-[linear-gradient(135deg,#6c4fcf_0%,#8866e8_100%)] text-white border-none rounded-[20px] py-3.75 text-[16px] font-black font-['Nunito',sans-serif] cursor-pointer shadow-[0_5px_0_#4a30a0,0_8px_20px_rgba(80,50,180,0.3)] mt-1 transition-all duration-150 active:translate-y-0.75 active:shadow-[0_2px_0_#4a30a0]"
+            disabled={submitting}
+            className="bg-[linear-gradient(135deg,#6c4fcf_0%,#8866e8_100%)] text-white border-none rounded-[20px] py-3.75 text-[16px] font-black font-['Nunito',sans-serif] cursor-pointer shadow-[0_5px_0_#4a30a0,0_8px_20px_rgba(80,50,180,0.3)] mt-1 transition-all duration-150 active:translate-y-0.75 active:shadow-[0_2px_0_#4a30a0] disabled:opacity-50"
           >
-            Save {isExpense ? "Expense" : "Income"} →
+            {submitting
+              ? isEdit
+                ? "Updating Transaction…"
+                : "Saving Transaction…"
+              : isEdit
+                ? "Update Transaction →"
+                : `Save ${isExpense ? "Expense" : "Income"} →`}
           </button>
         </form>
       </div>

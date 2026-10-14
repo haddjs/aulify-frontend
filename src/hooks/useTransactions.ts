@@ -3,6 +3,7 @@ import {
   createTransaction,
   getBalance,
   getTransaction,
+  updateTransaction,
 } from "../api/transactions";
 import type { TransactionData } from "../components/TransactionModal";
 
@@ -46,11 +47,43 @@ export function useTransactions() {
   }, []);
 
   useEffect(() => {
-    refresh();
-  }, [refresh]);
+    let ignore = false;
+    async function load() {
+      try {
+        const [txList, bal] = await Promise.all([
+          getTransaction(),
+          getBalance(),
+        ]);
+        if (!ignore) {
+          setTransactions(txList);
+          setBalance(bal);
+        }
+      } catch (err) {
+        if (!ignore) {
+          setError(err instanceof Error ? err : new Error(String(err)));
+        }
+      } finally {
+        if (!ignore) {
+          setLoading(false);
+        }
+      }
+    }
+    load();
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
 
   const addTransaction = async (data: TransactionData) => {
     const res = await createTransaction(data);
+    await refresh();
+
+    return res;
+  };
+
+  const editTransaction = async (id: string, data: Partial<TransactionData>) => {
+    const res = await updateTransaction(id, data);
     await refresh();
 
     return res;
@@ -63,5 +96,8 @@ export function useTransactions() {
     error,
     refresh,
     addTransaction,
+    editTransaction,
+    setTransactions,
   };
 }
+

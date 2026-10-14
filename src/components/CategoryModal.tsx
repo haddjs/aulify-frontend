@@ -6,11 +6,15 @@ export type CategoryType = "expense" | "income";
 interface Props {
   initialType?: CategoryType;
   existingCategories?: Category[];
+  categoryToEdit?: Category | null;
   onClose: () => void;
-  onSave: (category: {
-    name: string;
-    type: CategoryType;
-  }) => Promise<Category>;
+  onSave: (
+    category: {
+      name: string;
+      type: CategoryType;
+    },
+    id?: string,
+  ) => Promise<Category>;
 }
 
 const EXPENSE_EMOJIS = [
@@ -50,15 +54,49 @@ const INCOME_EMOJIS = [
 export default function CategoryModal({
   initialType = "expense",
   existingCategories = [],
+  categoryToEdit,
   onClose,
   onSave,
 }: Props) {
-  const [type, setType] = useState<CategoryType>(initialType);
-  const [name, setName] = useState("");
-  const [selectedEmoji, setSelectedEmoji] = useState(
-    initialType === "expense" ? "🍔" : "💼",
+  const isEdit = Boolean(categoryToEdit);
+  const isDefaultSystemCategory = isEdit && categoryToEdit?.user_id === null;
+
+  const [type, setType] = useState<CategoryType>(
+    categoryToEdit?.type ?? initialType,
   );
-  const [includeEmojiInName, setIncludeEmojiInName] = useState(true);
+
+  const parseInitial = () => {
+    if (!categoryToEdit) {
+      return {
+        emoji: initialType === "expense" ? "🍔" : "💼",
+        name: "",
+        hasEmoji: true,
+      };
+    }
+    const raw = categoryToEdit.name.trim();
+    const emojiMatch = raw.match(
+      /^(\p{Extended_Pictographic}|\p{Emoji_Presentation})\s*(.*)$/u,
+    );
+    if (emojiMatch && emojiMatch[1]) {
+      return {
+        emoji: emojiMatch[1],
+        name: emojiMatch[2] || "",
+        hasEmoji: true,
+      };
+    }
+    return {
+      emoji: categoryToEdit.type === "expense" ? "🍔" : "💼",
+      name: raw,
+      hasEmoji: false,
+    };
+  };
+
+  const initialParsed = parseInitial();
+  const [name, setName] = useState(initialParsed.name);
+  const [selectedEmoji, setSelectedEmoji] = useState(initialParsed.emoji);
+  const [includeEmojiInName, setIncludeEmojiInName] = useState(
+    initialParsed.hasEmoji,
+  );
   const [note, setNote] = useState("");
   const [visible, setVisible] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -95,12 +133,18 @@ export default function CategoryModal({
   // Check if category name already exists in current type
   const isDuplicate = existingCategories.some(
     (c) =>
+      c.id !== categoryToEdit?.id &&
       c.type === type &&
       c.name.trim().toLowerCase() === finalCategoryName.trim().toLowerCase(),
   );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isDefaultSystemCategory) {
+      setError("Default system categories cannot be modified.");
+      return;
+    }
+
     const cleanName = name.trim();
     if (!cleanName) {
       setError("Please enter a category name");
@@ -115,13 +159,16 @@ export default function CategoryModal({
     try {
       setLoading(true);
       setError(null);
-      await onSave({
-        name: finalCategoryName,
-        type,
-      });
+      await onSave(
+        {
+          name: finalCategoryName,
+          type,
+        },
+        categoryToEdit?.id,
+      );
       handleClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create category");
+      setError(err instanceof Error ? err.message : "Failed to save category");
     } finally {
       setLoading(false);
     }
@@ -161,10 +208,14 @@ export default function CategoryModal({
             </div>
             <div>
               <div className="text-[20px] font-black text-clay-text">
-                New Category
+                {isEdit ? "Edit Category" : "New Category"}
               </div>
               <div className="text-[12px] text-clay-muted font-semibold">
-                Organize your {isExpense ? "expenses" : "income"} in detail
+                {isEdit
+                  ? isDefaultSystemCategory
+                    ? "Default system category (Locked)"
+                    : "Update category name and icon"
+                  : `Organize your ${isExpense ? "expenses" : "income"} in detail`}
               </div>
             </div>
           </div>
@@ -178,36 +229,62 @@ export default function CategoryModal({
         </div>
 
         <form onSubmit={handleSubmit} className="px-6 flex flex-col gap-4">
-          {/* Type Switcher */}
-          <div>
-            <label className="text-[13px] font-extrabold text-clay-text block mb-2">
-              Category Type
-            </label>
-            <div className="clay-card p-1.5 flex gap-2 rounded-2xl">
-              <button
-                type="button"
-                onClick={() => handleTypeChange("expense")}
-                className={`flex-1 py-2.5 px-4 border-none cursor-pointer rounded-xl font-['Nunito',sans-serif] text-[13px] font-extrabold transition-all duration-200 flex items-center justify-center gap-2 ${
-                  isExpense
-                    ? "bg-[linear-gradient(135deg,#ff7660,#ff5a43)] text-white shadow-[0_4px_0_#d43f29]"
-                    : "bg-transparent text-clay-muted"
-                }`}
-              >
-                <span>📤</span> Expense
-              </button>
-              <button
-                type="button"
-                onClick={() => handleTypeChange("income")}
-                className={`flex-1 py-2.5 px-4 border-none cursor-pointer rounded-xl font-['Nunito',sans-serif] text-[13px] font-extrabold transition-all duration-200 flex items-center justify-center gap-2 ${
-                  !isExpense
-                    ? "bg-[linear-gradient(135deg,#1db070,#148a50)] text-white shadow-[0_4px_0_#0f683c]"
-                    : "bg-transparent text-clay-muted"
-                }`}
-              >
-                <span>📥</span> Income
-              </button>
+          {/* Default system category notice */}
+          {isDefaultSystemCategory && (
+            <div className="p-3.5 bg-[#f0eaf8] border border-[#d5c8ef] rounded-2xl text-[12px] font-bold text-clay-text flex items-center gap-2">
+              <span>🔒</span>
+              <span>This is a default preset category and cannot be edited.</span>
             </div>
-          </div>
+          )}
+
+          {/* Type Switcher */}
+          {isEdit ? (
+            <div className="clay-card p-3 rounded-2xl flex items-center justify-between">
+              <span className="text-[13px] font-extrabold text-clay-text">
+                Category Type
+              </span>
+              <span
+                className={`text-[12px] font-extrabold px-3 py-1 rounded-full ${
+                  isExpense
+                    ? "bg-[#ffd8ce] text-[#c03030]"
+                    : "bg-[#d4f5e8] text-[#148a50]"
+                }`}
+              >
+                {isExpense ? "Expense" : "Income"} (Fixed)
+              </span>
+            </div>
+          ) : (
+            <div>
+              <label className="text-[13px] font-extrabold text-clay-text block mb-2">
+                Category Type
+              </label>
+              <div className="clay-card p-1.5 flex gap-2 rounded-2xl">
+                <button
+                  type="button"
+                  onClick={() => handleTypeChange("expense")}
+                  className={`flex-1 py-2.5 px-4 border-none cursor-pointer rounded-xl font-['Nunito',sans-serif] text-[13px] font-extrabold transition-all duration-200 flex items-center justify-center gap-2 ${
+                    isExpense
+                      ? "bg-[linear-gradient(135deg,#ff7660,#ff5a43)] text-white shadow-[0_4px_0_#d43f29]"
+                      : "bg-transparent text-clay-muted"
+                  }`}
+                >
+                  <span>📤</span> Expense
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleTypeChange("income")}
+                  className={`flex-1 py-2.5 px-4 border-none cursor-pointer rounded-xl font-['Nunito',sans-serif] text-[13px] font-extrabold transition-all duration-200 flex items-center justify-center gap-2 ${
+                    !isExpense
+                      ? "bg-[linear-gradient(135deg,#1db070,#148a50)] text-white shadow-[0_4px_0_#0f683c]"
+                      : "bg-transparent text-clay-muted"
+                  }`}
+                >
+                  <span>📥</span> Income
+                </button>
+              </div>
+            </div>
+          )}
+
 
           {/* Category Icon / Emoji Picker */}
           <div>
@@ -342,11 +419,20 @@ export default function CategoryModal({
           {/* Submit Button */}
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || isDefaultSystemCategory}
             className="bg-[linear-gradient(135deg,#6c4fcf_0%,#8866e8_100%)] text-white border-none rounded-[20px] py-3.5 text-[15px] font-black font-['Nunito',sans-serif] cursor-pointer shadow-[0_5px_0_#4a30a0,0_8px_20px_rgba(80,50,180,0.3)] mt-2 transition-all duration-150 active:translate-y-0.75 active:shadow-[0_2px_0_#4a30a0] disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? "Creating Category…" : `Create ${isExpense ? "Expense" : "Income"} Category →`}
+            {isDefaultSystemCategory
+              ? "System Category (Locked)"
+              : loading
+              ? isEdit
+                ? "Updating Category…"
+                : "Creating Category…"
+              : isEdit
+              ? "Update Category →"
+              : `Create ${isExpense ? "Expense" : "Income"} Category →`}
           </button>
+
         </form>
       </div>
     </div>
