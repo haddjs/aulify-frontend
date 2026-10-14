@@ -127,7 +127,9 @@ export default function CategoryModal({
 
   // Formatted category name with or without emoji
   const finalCategoryName = (
-    includeEmojiInName && selectedEmoji ? `${selectedEmoji} ${name.trim()}` : name.trim()
+    includeEmojiInName && selectedEmoji
+      ? `${selectedEmoji} ${name.trim()}`
+      : name.trim()
   ).slice(0, 32);
 
   // Check if category name already exists in current type
@@ -152,7 +154,9 @@ export default function CategoryModal({
     }
 
     if (isDuplicate) {
-      setError(`A ${type} category named "${finalCategoryName}" already exists`);
+      setError(
+        `A ${type} category named "${finalCategoryName}" already exists`,
+      );
       return;
     }
 
@@ -177,7 +181,7 @@ export default function CategoryModal({
   return (
     <div
       onClick={handleClose}
-      className={`fixed inset-0 z-50 flex items-end sm:items-center justify-center transition-all duration-260 ease-out ${
+      className={`fixed inset-0 z-100 flex items-end sm:items-center justify-center transition-all duration-260 ease-out ${
         visible
           ? "bg-clay-text/35 backdrop-blur-xs"
           : "bg-transparent backdrop-blur-none"
@@ -233,7 +237,9 @@ export default function CategoryModal({
           {isDefaultSystemCategory && (
             <div className="p-3.5 bg-[#f0eaf8] border border-[#d5c8ef] rounded-2xl text-[12px] font-bold text-clay-text flex items-center gap-2">
               <span>🔒</span>
-              <span>This is a default preset category and cannot be edited.</span>
+              <span>
+                This is a default preset category and cannot be edited.
+              </span>
             </div>
           )}
 
@@ -284,7 +290,6 @@ export default function CategoryModal({
               </div>
             </div>
           )}
-
 
           {/* Category Icon / Emoji Picker */}
           <div>
@@ -347,7 +352,11 @@ export default function CategoryModal({
                   setError(null);
                 }}
                 maxLength={28}
-                placeholder={isExpense ? "e.g. Groceries, Streaming" : "e.g. Salary, Consulting"}
+                placeholder={
+                  isExpense
+                    ? "e.g. Groceries, Streaming"
+                    : "e.g. Salary, Consulting"
+                }
                 required
                 className="flex-1 border-none outline-none bg-transparent text-[14px] font-extrabold text-clay-text font-['Nunito',sans-serif] py-2.5"
               />
@@ -392,7 +401,8 @@ export default function CategoryModal({
                     {finalCategoryName || "Category Name"}
                   </div>
                   <div className="text-[11px] font-semibold text-clay-muted">
-                    {note || (isExpense ? "Expense Category" : "Income Category")}
+                    {note ||
+                      (isExpense ? "Expense Category" : "Income Category")}
                   </div>
                 </div>
               </div>
@@ -425,14 +435,13 @@ export default function CategoryModal({
             {isDefaultSystemCategory
               ? "System Category (Locked)"
               : loading
-              ? isEdit
-                ? "Updating Category…"
-                : "Creating Category…"
-              : isEdit
-              ? "Update Category →"
-              : `Create ${isExpense ? "Expense" : "Income"} Category →`}
+                ? isEdit
+                  ? "Updating Category…"
+                  : "Creating Category…"
+                : isEdit
+                  ? "Update Category →"
+                  : `Create ${isExpense ? "Expense" : "Income"} Category →`}
           </button>
-
         </form>
       </div>
     </div>
